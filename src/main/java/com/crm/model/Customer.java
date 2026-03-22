@@ -3,12 +3,12 @@ package com.crm.model;
 import com.crm.model.value.Email;
 import com.crm.model.value.PhoneNumber;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public class Customer extends BaseEntity<Long> {
 
     private String firstName;

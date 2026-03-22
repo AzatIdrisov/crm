@@ -3,15 +3,15 @@ package com.crm.model;
 import com.crm.model.enums.DealStatus;
 import com.crm.model.value.Money;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public class Deal extends BaseEntity<Long> implements Comparable<Deal> {
 
     private String title;

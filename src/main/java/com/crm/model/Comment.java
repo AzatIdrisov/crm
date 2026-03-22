@@ -1,12 +1,12 @@
 package com.crm.model;
 
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public class Comment extends BaseEntity<Long> {
 
     private String content;

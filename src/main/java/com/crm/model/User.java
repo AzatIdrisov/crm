@@ -3,12 +3,12 @@ package com.crm.model;
 import com.crm.model.enums.UserRole;
 import com.crm.model.value.Email;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public class User extends BaseEntity<Long> {
 
     private String firstName;

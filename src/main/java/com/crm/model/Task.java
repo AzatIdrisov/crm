@@ -2,14 +2,14 @@ package com.crm.model;
 
 import com.crm.model.enums.TaskPriority;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 public class Task extends BaseEntity<Long> {
 
     private String title;
