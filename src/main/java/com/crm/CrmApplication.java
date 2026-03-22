@@ -7,10 +7,15 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+// Включает автоконфигурацию, сканирование компонентов и конфигурацию Spring Boot
 @SpringBootApplication
+// Разрешает выполнение методов с @Async в отдельных потоках (уведомления, события)
 @EnableAsync
+// Разрешает выполнение методов с @Scheduled по расписанию
 @EnableScheduling
+// Включает поддержку кэширования через @Cacheable / @CacheEvict / @CachePut
 @EnableCaching
+// Автоматически регистрирует все классы с @ConfigurationProperties как Spring-бины
 @ConfigurationPropertiesScan
 public class CrmApplication {
 
