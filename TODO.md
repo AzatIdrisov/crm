@@ -24,9 +24,12 @@
 
 - [ ] **4.1** Настроить application.yml (dev/prod профили, @ConfigurationProperties)
 - [ ] **4.2** Реализовать CRUD REST API (Customer, Deal, Task)
-- [ ] **4.3** @ControllerAdvice: глобальная обработка ошибок и кастомные исключения
-- [ ] **4.4** Spring Security + JWT аутентификация и авторизация по ролям
-- [ ] **4.5** Spring Events: DealStatusChangedEvent + @Async @EventListener
+- [ ] **4.3** Валидация запросов через Bean Validation (@Valid, @NotNull, @NotBlank, @Size, @Email, @Min, @Max, @Pattern)
+- [ ] **4.4** Кастомные аннотации валидации (@UniqueEmail, @ValidPhone) с собственным ConstraintValidator
+- [ ] **4.5** @ControllerAdvice: глобальная обработка ошибок (MethodArgumentNotValidException, ConstraintViolationException, кастомные исключения)
+- [ ] **4.6** Иерархия исключений (CrmException → ResourceNotFoundException, ValidationException, ConflictException) + ErrorResponse DTO
+- [ ] **4.7** Spring Security + JWT аутентификация и авторизация по ролям
+- [ ] **4.8** Spring Events: DealStatusChangedEvent + @Async @EventListener
 
 ## Фаза 5 — База данных (PostgreSQL)
 

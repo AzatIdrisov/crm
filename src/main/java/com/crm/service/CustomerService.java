@@ -24,29 +24,32 @@ public class CustomerService {
     // Optional вместо null-проверок
     // -------------------------------------------------------------------------
 
-    // TODO 2.2.1: вернуть Optional<Customer> по id (использовать Optional.ofNullable)
     public Optional<Customer> findById(Long id) {
-        return Optional.empty();
+        return Optional.ofNullable(store.get(id));
     }
 
-    // TODO 2.2.2: найти клиента по email через stream + findFirst, вернуть Optional
     public Optional<Customer> findByEmail(Email email) {
-        return Optional.empty();
+        return store
+                .values()
+                .stream()
+                .filter(customer -> email.equals(customer.getEmail()))
+                .findFirst();
     }
 
-    // TODO 2.2.3: получить клиента или бросить NoSuchElementException через orElseThrow
     public Customer getByIdOrThrow(Long id) {
-        return null;
+        return findById(id).orElseThrow(NoSuchElementException::new);
     }
 
-    // TODO 2.2.4: вернуть отображаемое имя через цепочку map → map → filter → orElse
-    //             если имя пустое или клиент не найден — вернуть "Unknown Customer"
     public String getDisplayName(Long id) {
-        return null;
+        return findById(id)
+                .map(Customer::getFullName)
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .orElse("Unknown Customer");
     }
 
-    // TODO 2.2.5: вывести в консоль имя клиента через ifPresent (если найден)
     public void printIfExists(Long id) {
+        findById(id).ifPresent(c -> System.out.println(c.getFullName()));
     }
 
     public Customer save(Customer customer) {
@@ -65,56 +68,55 @@ public class CustomerService {
     // Predicate<Customer>
     // -------------------------------------------------------------------------
 
-    // TODO 2.3.1: предикат — у клиента заполнена компания (не null и не blank)
-    public static final Predicate<Customer> HAS_COMPANY = null;
+    public static final Predicate<Customer> HAS_COMPANY = customer -> (customer.getCompany() != null) && (!customer.getCompany().isBlank());
 
-    // TODO 2.3.2: предикат — у клиента есть телефон
-    public static final Predicate<Customer> HAS_PHONE = null;
+    public static final Predicate<Customer> HAS_PHONE = customer -> (customer.getPhone() != null);
 
-    // TODO 2.3.3: предикат — у клиента есть email
-    public static final Predicate<Customer> HAS_EMAIL = null;
+    public static final Predicate<Customer> HAS_EMAIL = customer -> customer.getEmail() != null;
 
-    // TODO 2.3.4: фабричный метод — предикат "клиент из заданной компании" (ignoreCase)
     public static Predicate<Customer> fromCompany(String company) {
-        return null;
+        return customer -> company.equalsIgnoreCase(customer.getCompany());
     }
 
-    // TODO 2.3.5: скомбинировать HAS_EMAIL и HAS_PHONE через and()
     public static Predicate<Customer> isFullyContacted() {
-        return null;
+        return HAS_EMAIL.and(HAS_PHONE);
     }
 
-    // TODO 2.3.6: отфильтровать store по произвольному Predicate и вернуть список
     public List<Customer> filter(Predicate<Customer> predicate) {
-        return null;
+        return store.values().stream().filter(predicate).toList();
     }
 
     // -------------------------------------------------------------------------
     // Function<Customer, R>
     // -------------------------------------------------------------------------
 
-    // TODO 2.3.7: Function — преобразовать клиента в строку "Имя Фамилия (компания)"
-    //             если компания null — подставить "no company"
-    public static final Function<Customer, String> TO_DISPLAY_NAME = null;
+    public static final Function<Customer, String> TO_DISPLAY_NAME =
+            c -> "%s %s (%s)".formatted(
+                    c.getFirstName(),
+                    c.getLastName(),
+                    Optional.ofNullable(c.getCompany()).orElse("no company")
+            );
 
-    // TODO 2.3.8: Function composition через andThen — TO_DISPLAY_NAME + toUpperCase
-    public static final Function<Customer, String> TO_UPPER_DISPLAY = null;
 
-    // TODO 2.3.9: применить TO_DISPLAY_NAME ко всем клиентам через stream + map
+    public static final Function<Customer, String> TO_UPPER_DISPLAY = TO_DISPLAY_NAME.andThen(String::toUpperCase);
+
     public List<String> mapToDisplayNames(List<Customer> customers) {
-        return null;
+        return customers.stream().map(TO_DISPLAY_NAME).toList();
     }
 
     // -------------------------------------------------------------------------
     // BiFunction
     // -------------------------------------------------------------------------
 
-    // TODO 2.3.10: BiFunction(клиент, список сделок) → сделки этого клиента
-    public static final BiFunction<Customer, List<Deal>, List<Deal>> GET_CUSTOMER_DEALS = null;
+    public static final BiFunction<Customer, List<Deal>, List<Deal>> GET_CUSTOMER_DEALS =
+            (customer, deals) -> deals.stream()
+                    .filter(d -> customer.equals(d.getCustomer()))
+                    .toList();
 
-    // TODO 2.3.11: BiFunction(клиент, статус) → Predicate<Deal>
-    //              результирующий предикат: сделка принадлежит клиенту И имеет нужный статус
+
     public static BiFunction<Customer, DealStatus, Predicate<Deal>> dealsByStatus() {
-        return null;
+        return (customer, status) ->
+                d -> customer.equals(d.getCustomer()) && d.getStatus() == status;
     }
+
 }
