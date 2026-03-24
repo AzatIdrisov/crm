@@ -38,70 +38,61 @@ public class DealLoaderService {
     // supplyAsync — асинхронная загрузка
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.6: Загрузить сделку асинхронно через CompletableFuture.supplyAsync().
-     *             Внутри: сделать Thread.sleep(300) (имитация БД),
-     *             залогировать "Загрузка сделки {id} в потоке {threadName}",
-     *             вернуть заглушку: new Deal() с id.
-     *             Передать executor вторым аргументом в supplyAsync.
-     */
     public CompletableFuture<Deal> loadDealAsync(Long id) {
-        return null;
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(300);
+                log.info("Загрузка сделки {} в потоке {}", id, Thread.currentThread().getName());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return Deal.builder().id(id).build();
+        }, executor);
     }
 
     // -------------------------------------------------------------------------
     // thenApply — преобразование результата
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.7: Загрузить сделку через loadDealAsync(id),
-     *             затем через thenApply() преобразовать в строку:
-     *             "Deal #id: title [status]"
-     */
     public CompletableFuture<String> loadDealAsString(Long id) {
-        return null;
+       return loadDealAsync(id)
+                .thenApply(deal -> "Deal %s: title [%s]".formatted(deal.getId(), deal.getStatus()));
     }
 
     // -------------------------------------------------------------------------
     // thenCombine — объединение двух futures
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.8: Загрузить две сделки параллельно через loadDealAsync(),
-     *             объединить через thenCombine() в список List<Deal>.
-     *             Обе загрузки должны идти параллельно, не последовательно.
-     */
     public CompletableFuture<List<Deal>> loadTwoDeals(Long id1, Long id2) {
-        return null;
+        CompletableFuture<Deal> first = loadDealAsync(id1);
+        CompletableFuture<Deal> second = loadDealAsync(id2);
+        return first.thenCombine(second, List::of);
     }
 
     // -------------------------------------------------------------------------
     // exceptionally — обработка ошибок
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.9: Загрузить сделку, но если id < 0 — бросить IllegalArgumentException.
-     *             Через exceptionally() поймать ошибку, залогировать её,
-     *             вернуть new Deal() как заглушку (fallback).
-     */
     public CompletableFuture<Deal> loadWithFallback(Long id) {
-        return null;
+        CompletableFuture<Deal> future = CompletableFuture.supplyAsync(() -> {
+            if (id < 0) throw new IllegalArgumentException("Некорректный id: " + id);
+            return Deal.builder().id(id).build();
+        }, executor);
+        return future.exceptionally(ex -> {
+            log.error("Ошибка загрузки сделки {}: {}", id, ex.getMessage());
+            return new Deal();
+        });
     }
 
     // -------------------------------------------------------------------------
     // allOf — ждём все futures
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.10: Загрузить список сделок параллельно.
-     *              Для каждого id вызвать loadDealAsync(),
-     *              собрать все CompletableFuture через allOf(),
-     *              после завершения всех — собрать результаты в List<Deal>.
-     *
-     *  Подсказка: CompletableFuture<Void> all = CompletableFuture.allOf(futures[])
-     *             all.thenApply(_ -> stream из futures -> .join())
-     */
     public CompletableFuture<List<Deal>> loadAll(List<Long> ids) {
-        return null;
+        List<CompletableFuture<Deal>> futures = ids.stream().map(this::loadDealAsync).toList();
+        CompletableFuture<Void> all = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        return all.thenApply(v -> futures.stream().map(CompletableFuture::join).toList());
+
     }
+
 }

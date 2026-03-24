@@ -34,12 +34,6 @@ public class NotificationService {
     // submit(Runnable) — fire and forget
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.1: Отправить одно уведомление асинхронно через executor.submit().
-     *             Внутри Runnable: сделать Thread.sleep(100) (имитация отправки),
-     *             затем залогировать "Уведомление отправлено: {message}"
-     *             Исключения InterruptedException — пробросить через Thread.currentThread().interrupt()
-     */
     public void sendNotification(String message) {
         executor.submit(() -> {
             try {
@@ -51,10 +45,6 @@ public class NotificationService {
         });
     }
 
-    /**
-     * TODO 3.1.2: Отправить список уведомлений — для каждого вызвать sendNotification().
-     *             Залогировать "Отправка {n} уведомлений" перед отправкой.
-     */
     public void sendBatch(List<String> messages) {
         log.info("Отправка {} уведомлений", messages.size());
         messages.forEach(this::sendNotification);
@@ -64,11 +54,6 @@ public class NotificationService {
     // submit(Callable) — задача с результатом
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.3: Отправить уведомление и вернуть Future<String> с результатом.
-     *             Callable должен: сделать Thread.sleep(200), вернуть "OK: {message}".
-     *             Метод сразу возвращает Future — не ждёт выполнения.
-     */
     public Future<String> sendWithResult(String message) {
         return executor.submit(() -> {
             try {
@@ -81,11 +66,6 @@ public class NotificationService {
         });
     }
 
-    /**
-     * TODO 3.1.4: Дождаться результата из Future.get() и вернуть его.
-     *             Обработать ExecutionException и InterruptedException —
-     *             залогировать ошибку и вернуть "ERROR".
-     */
     public String waitForResult(Future<String> future) {
         try {
             return future.get();
@@ -99,9 +79,6 @@ public class NotificationService {
         }
     }
 
-    /**
-     * TODO 3.1.5: Отправить список уведомлений и дождаться результатов.
-     */
     public List<String> sendBatchWithResult(List<String> messages) {
         return messages.stream()
                 .map(this::sendWithResult)
@@ -113,13 +90,6 @@ public class NotificationService {
     // Graceful shutdown
     // -------------------------------------------------------------------------
 
-    /**
-     * TODO 3.1.5: Корректно завершить пул:
-     *             1. executor.shutdown()              — перестать принимать новые задачи
-     *             2. awaitTermination(5, SECONDS)     — подождать завершения текущих
-     *             3. Если не завершился — executor.shutdownNow()  — принудительно
-     *             Залогировать каждый шаг.
-     */
     public void shutdown() {
         log.info("Завершение пула");
         executor.shutdown();

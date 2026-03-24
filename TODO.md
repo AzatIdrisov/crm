@@ -16,7 +16,7 @@
 
 ## Фаза 3 — Многопоточность
 
-- [ ] **3.1** ExecutorService для уведомлений + CompletableFuture для асинхронной загрузки
+- [x] **3.1** ExecutorService для уведомлений + CompletableFuture для асинхронной загрузки
 - [ ] **3.2** AtomicInteger, ReentrantLock, ConcurrentHashMap в сервисах
 - [ ] **3.3** BlockingQueue (producer-consumer) + ScheduledExecutorService
 
