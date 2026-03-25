@@ -13,11 +13,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Сервис статистики CRM — демонстрирует потокобезопасные примитивы.
- *
+ * <p>
  * Ключевые концепции:
- *  - AtomicInteger          — атомарный счётчик без synchronized
- *  - ReentrantLock          — явная блокировка с lock()/unlock() в finally
- *  - ConcurrentHashMap      — потокобезопасная Map, computeIfAbsent, merge
+ * - AtomicInteger          — атомарный счётчик без synchronized
+ * - ReentrantLock          — явная блокировка с lock()/unlock() в finally
+ * - ConcurrentHashMap      — потокобезопасная Map, computeIfAbsent, merge
  */
 @Service
 public class CrmStatisticsService {
@@ -29,8 +29,8 @@ public class CrmStatisticsService {
     // -------------------------------------------------------------------------
 
     private final AtomicInteger totalDealsCreated = new AtomicInteger(0);
-    private final AtomicInteger totalDealsWon     = new AtomicInteger(0);
-    private final AtomicInteger totalDealsLost    = new AtomicInteger(0);
+    private final AtomicInteger totalDealsWon = new AtomicInteger(0);
+    private final AtomicInteger totalDealsLost = new AtomicInteger(0);
 
     /**
      * TODO 3.2.1: Атомарно увеличить totalDealsCreated на 1.
@@ -38,7 +38,7 @@ public class CrmStatisticsService {
      *             Использовать incrementAndGet().
      */
     public int recordDealCreated() {
-        return 0;
+        return totalDealsCreated.incrementAndGet();
     }
 
     /**
@@ -48,6 +48,11 @@ public class CrmStatisticsService {
      *             Использовать incrementAndGet().
      */
     public void recordDealStatusChanged(DealStatus newStatus) {
+        if (newStatus == DealStatus.WON) {
+            totalDealsWon.incrementAndGet();
+        } else if (newStatus == DealStatus.LOST) {
+            totalDealsLost.incrementAndGet();
+        }
     }
 
     /**
@@ -57,7 +62,7 @@ public class CrmStatisticsService {
      *             Формула: (won / created) * 100.0
      */
     public double getWinRate() {
-        return 0.0;
+        return (double) totalDealsWon.get() / totalDealsCreated.get() * 100.0;
     }
 
     /**
@@ -65,6 +70,9 @@ public class CrmStatisticsService {
      *             Использовать set(0).
      */
     public void resetCounters() {
+        totalDealsCreated.set(0);
+        totalDealsWon.set(0);
+        totalDealsLost.set(0);
     }
 
     // -------------------------------------------------------------------------
@@ -82,6 +90,13 @@ public class CrmStatisticsService {
      *             unlock() — ВСЕГДА в блоке finally.
      */
     public void generateReport() {
+
+        reportLock.lock();
+        try {
+            lastReport = String.format("Deals: created=%d, won=%d, lost=%d", totalDealsCreated.get(), totalDealsWon.get(), totalDealsLost.get());
+        } finally {
+            reportLock.unlock();
+        }
     }
 
     /**
@@ -90,7 +105,15 @@ public class CrmStatisticsService {
      *             Использовать tryLock() — если лок занят, вернуть "Report is being generated...".
      */
     public String getLastReport() {
-        return "";
+        if (reportLock.tryLock()) {
+            try {
+                return lastReport;
+            } finally {
+                reportLock.unlock();
+            }
+        } else {
+            return "Report is being generated...";
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -107,6 +130,7 @@ public class CrmStatisticsService {
      *             Вернуть true если добавили, false если уже была.
      */
     public boolean cacheDeal(Deal deal) {
+        dealCache.putIfAbsent(deal.getId(), deal);
         return false;
     }
 
@@ -116,6 +140,7 @@ public class CrmStatisticsService {
      *             Использовать computeIfAbsent().
      */
     public Deal getOrLoad(Long id) {
+        dealCache.computeIfAbsent(id, this::loadFromDb);
         return null;
     }
 
@@ -124,6 +149,7 @@ public class CrmStatisticsService {
      *             Использовать merge(key, 1, Integer::sum).
      */
     public void indexByStatus(List<Deal> deals) {
+        deals.forEach(deal -> countByStatus.merge(deal.getId, 1, Integer::sum);
     }
 
     /**
@@ -132,7 +158,7 @@ public class CrmStatisticsService {
      *              Использовать getOrDefault().
      */
     public int getCountByStatus(DealStatus status) {
-        return 0;
+        return countByStatus.getOrDefault(status, 0);
     }
 
     // -------------------------------------------------------------------------
