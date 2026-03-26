@@ -69,6 +69,9 @@ public class NotificationService {
     public String waitForResult(Future<String> future) {
         try {
             return future.get();
+        } catch (java.util.concurrent.CancellationException e) {
+            log.error("Задача была отменена", e);
+            return "ERROR";
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Ошибка при получении результата", e);

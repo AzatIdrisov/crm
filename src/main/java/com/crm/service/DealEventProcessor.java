@@ -1,10 +1,12 @@
 package com.crm.service;
 
+import com.crm.config.CrmProperties;
 import com.crm.model.enums.DealStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,8 +34,8 @@ public class DealEventProcessor {
     // Запись о событии сделки (статус изменился)
     public record DealEvent(Long dealId, DealStatus newStatus) {}
 
-    // Ограниченная очередь событий — не более 100 элементов
-    private final BlockingQueue<DealEvent> eventQueue = new LinkedBlockingQueue<>(100);
+    // Ограниченная очередь событий — размер из конфигурации
+    private final BlockingQueue<DealEvent> eventQueue;
 
     // Флаг для остановки consumer-потока
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -42,9 +44,14 @@ public class DealEventProcessor {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private final CrmStatisticsService statisticsService;
+    private final Duration reminderDelay;
+    private final boolean reminderEnabled;
 
-    public DealEventProcessor(CrmStatisticsService statisticsService) {
+    public DealEventProcessor(CrmStatisticsService statisticsService, CrmProperties crmProperties) {
         this.statisticsService = statisticsService;
+        this.eventQueue = new LinkedBlockingQueue<>(crmProperties.getQueue().getCapacity());
+        this.reminderDelay = crmProperties.getNotification().getReminderDelay();
+        this.reminderEnabled = crmProperties.getNotification().isEnabled();
     }
 
     // =========================================================================
@@ -158,12 +165,19 @@ public class DealEventProcessor {
     }
 
     /**
-     * TODO 3.3.8: Запланировать одноразовую задачу: через 60 секунд залогировать
-     *             "Напоминание: проверь незакрытые сделки".
-     *             Использовать scheduler.schedule().
+     * Запланировать одноразовую задачу: через настроенную задержку залогировать
+     * "Напоминание: проверь незакрытые сделки".
      */
     public void scheduleReminder() {
-        scheduler.schedule(() -> log.info("Напоминание: проверь незакрытые сделки"), 60, TimeUnit.SECONDS);
+        if (!reminderEnabled) {
+            log.info("Напоминания отключены настройкой crm.notification.enabled");
+            return;
+        }
+        scheduler.schedule(
+                () -> log.info("Напоминание: проверь незакрытые сделки"),
+                reminderDelay.toMillis(),
+                TimeUnit.MILLISECONDS
+        );
     }
 
     /**

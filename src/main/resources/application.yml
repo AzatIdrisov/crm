@@ -1,5 +1,6 @@
 spring:
   application:
+    # Имя приложения — используется в логах, Actuator и Spring Cloud (если появится).
     name: crm
 
   # На данном этапе отключаем автоконфигурацию БД и Redis,
@@ -14,25 +15,80 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration
 
+crm:
+  # Кастомный префикс для @ConfigurationProperties (CrmProperties).
+  instance-name: crm-local
+  notification:
+    # Вкл/выкл доменные уведомления (будет подключено в сервисах).
+    enabled: true
+    # Длительность парсится Spring Boot как Duration: 60s, 5m, 2h и т.д.
+    reminder-delay: 60s
+  queue:
+    # Ограничение очереди событий, см. DealEventProcessor.
+    capacity: 100
+
 server:
+  # Порт HTTP сервера приложения.
   port: 8080
 
 management:
   endpoints:
     web:
+      # Явно открываем основные Actuator endpoints для локальной диагностики.
       exposure:
         include: health, info, metrics, prometheus
   endpoint:
     health:
+      # Для dev удобно видеть детали состояния.
       show-details: always
 
 springdoc:
   api-docs:
+    # Swagger OpenAPI JSON.
     path: /api-docs
   swagger-ui:
+    # UI документации.
     path: /swagger-ui.html
 
 logging:
   level:
+    # Локальный уровень логов приложения и Spring.
     com.crm: DEBUG
     org.springframework: INFO
+
+---
+# Профиль dev активируется через:
+#   - переменную окружения SPRING_PROFILES_ACTIVE=dev
+#   - аргумент --spring.profiles.active=dev
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+crm:
+  # Пример переопределения для окружения.
+  instance-name: crm-dev
+
+server:
+  # Отдельный порт для dev (чтобы не конфликтовать с prod или другим сервисом).
+  port: 8081
+
+logging:
+  level:
+    com.crm: DEBUG
+
+---
+# Профиль prod активируется тем же способом, но значением "prod".
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+crm:
+  # Идентификатор инстанса в проде (можно привязать к окружению/инфраструктуре).
+  instance-name: crm-prod
+
+logging:
+  level:
+    # В проде обычно снижаем шум логов.
+    com.crm: INFO
