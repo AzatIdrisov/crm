@@ -1,5 +1,7 @@
 package com.crm.dto.customer;
 
+import com.crm.validation.UniqueEmail;
+import com.crm.validation.ValidPhone;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -15,10 +17,11 @@ public class CustomerRequest {
     @NotBlank
     // Bean Validation проверяет формат строки, а VO Email создаётся в маппере.
     @Email
+    @UniqueEmail
     private String email;
 
     // @Pattern валидирует строку, но не нормализует формат — это делаем позже.
-    @Pattern(regexp = "^\\+?[\\d\\s\\-().]{7,20}$")
+    @ValidPhone
     private String phone;
 
     private String company;
