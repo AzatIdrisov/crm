@@ -1,7 +1,11 @@
 package com.crm.controller;
 
+import com.crm.dto.deal.DealRequest;
+import com.crm.dto.deal.DealResponse;
+import com.crm.mapper.DealMapper;
 import com.crm.model.Deal;
 import com.crm.service.DealService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,30 +23,35 @@ public class DealController {
     }
 
     @GetMapping
-    public List<Deal> findAll() {
-        return dealService.findAll();
+    public List<DealResponse> findAll() {
+        return dealService.findAll()
+                .stream()
+                .map(DealMapper::toResponse)
+                .toList();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Deal> findById(@PathVariable Long id) {
+    public ResponseEntity<DealResponse> findById(@PathVariable Long id) {
         return dealService.findById(id)
+                .map(DealMapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Deal> create(@RequestBody Deal deal) {
-        Deal saved = dealService.save(deal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public ResponseEntity<DealResponse> create(@Valid @RequestBody DealRequest request) {
+        Deal saved = dealService.save(DealMapper.toDomain(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(DealMapper.toResponse(saved));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Deal> update(@PathVariable Long id, @RequestBody Deal deal) {
+    public ResponseEntity<DealResponse> update(@PathVariable Long id, @Valid @RequestBody DealRequest request) {
         if (dealService.findById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        deal.setId(id);
-        return ResponseEntity.ok(dealService.save(deal));
+        Deal updated = DealMapper.toDomain(request);
+        updated.setId(id);
+        return ResponseEntity.ok(DealMapper.toResponse(dealService.save(updated)));
     }
 
     @DeleteMapping("/{id}")

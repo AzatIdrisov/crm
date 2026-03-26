@@ -1,7 +1,11 @@
 package com.crm.controller;
 
+import com.crm.dto.customer.CustomerRequest;
+import com.crm.dto.customer.CustomerResponse;
+import com.crm.mapper.CustomerMapper;
 import com.crm.model.Customer;
 import com.crm.service.CustomerService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,30 +23,35 @@ public class CustomerController {
     }
 
     @GetMapping
-    public List<Customer> findAll() {
-        return customerService.findAll();
+    public List<CustomerResponse> findAll() {
+        return customerService.findAll()
+                .stream()
+                .map(CustomerMapper::toResponse)
+                .toList();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Customer> findById(@PathVariable Long id) {
+    public ResponseEntity<CustomerResponse> findById(@PathVariable Long id) {
         return customerService.findById(id)
+                .map(CustomerMapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Customer> create(@RequestBody Customer customer) {
-        Customer saved = customerService.save(customer);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerRequest request) {
+        Customer saved = customerService.save(CustomerMapper.toDomain(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(CustomerMapper.toResponse(saved));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Customer> update(@PathVariable Long id, @RequestBody Customer customer) {
+    public ResponseEntity<CustomerResponse> update(@PathVariable Long id, @Valid @RequestBody CustomerRequest request) {
         if (customerService.findById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        customer.setId(id);
-        return ResponseEntity.ok(customerService.save(customer));
+        Customer updated = CustomerMapper.toDomain(request);
+        updated.setId(id);
+        return ResponseEntity.ok(CustomerMapper.toResponse(customerService.save(updated)));
     }
 
     @DeleteMapping("/{id}")
