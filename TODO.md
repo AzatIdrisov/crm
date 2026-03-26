@@ -22,7 +22,7 @@
 
 ## Фаза 4 — Spring & Spring Boot
 
-- [ ] **4.1** Настроить application.yml (dev/prod профили, @ConfigurationProperties)
+- [x] **4.1** Настроить application.yml (dev/prod профили, @ConfigurationProperties)
 - [ ] **4.2** Реализовать CRUD REST API (Customer, Deal, Task)
 - [ ] **4.3** Валидация запросов через Bean Validation (@Valid, @NotNull, @NotBlank, @Size, @Email, @Min, @Max, @Pattern)
 - [ ] **4.4** Кастомные аннотации валидации (@UniqueEmail, @ValidPhone) с собственным ConstraintValidator

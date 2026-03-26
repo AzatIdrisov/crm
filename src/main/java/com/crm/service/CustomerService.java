@@ -64,6 +64,10 @@ public class CustomerService {
         return new ArrayList<>(store.values());
     }
 
+    public boolean deleteById(Long id) {
+        return store.remove(id) != null;
+    }
+
     // -------------------------------------------------------------------------
     // Predicate<Customer>
     // -------------------------------------------------------------------------
