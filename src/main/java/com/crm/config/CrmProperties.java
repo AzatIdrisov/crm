@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
+// @Validated включает проверку bean validation для @ConfigurationProperties.
 @Validated
 @ConfigurationProperties(prefix = "crm")
 public class CrmProperties {

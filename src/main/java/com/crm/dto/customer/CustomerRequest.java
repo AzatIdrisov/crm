@@ -13,9 +13,11 @@ public class CustomerRequest {
     private String lastName;
 
     @NotBlank
+    // Bean Validation проверяет формат строки, а VO Email создаётся в маппере.
     @Email
     private String email;
 
+    // @Pattern валидирует строку, но не нормализует формат — это делаем позже.
     @Pattern(regexp = "^\\+?[\\d\\s\\-().]{7,20}$")
     private String phone;
 

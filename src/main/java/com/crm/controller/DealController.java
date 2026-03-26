@@ -39,6 +39,7 @@ public class DealController {
     }
 
     @PostMapping
+    // @Valid валидирует DTO до входа в метод контроллера.
     public ResponseEntity<DealResponse> create(@Valid @RequestBody DealRequest request) {
         Deal saved = dealService.save(DealMapper.toDomain(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(DealMapper.toResponse(saved));

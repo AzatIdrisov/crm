@@ -19,6 +19,7 @@ public class DealRequest {
     private BigDecimal amount;
 
     @NotBlank
+    // Формат ISO 4217, фактическая валидность кода проверяется при создании Money.
     @Pattern(regexp = "^[A-Z]{3}$")
     private String currency;
 
