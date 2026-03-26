@@ -1,6 +1,5 @@
 package com.crm.service;
 
-import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +58,11 @@ public class DealEventProcessor {
      *             Метод бросает InterruptedException — пробросить его в сигнатуре.
      */
     public void publishEvent(Long dealId, DealStatus newStatus) throws InterruptedException {
+        DealEvent event = new DealEvent(dealId, newStatus);
+        boolean added = eventQueue.offer(event, 500, TimeUnit.MILLISECONDS);
+        if (!added) {
+            log.warn("Очередь переполнена, событие не добавлено");
+        }
     }
 
     /**
@@ -67,6 +71,11 @@ public class DealEventProcessor {
      *             Если вернул false — залогировать предупреждение "Очередь переполнена, событие отброшено".
      */
     public void publishEventNonBlocking(Long dealId, DealStatus newStatus) {
+        DealEvent event = new DealEvent(dealId, newStatus);
+        boolean added = eventQueue.offer(event);
+        if (!added) {
+            log.warn("Очередь переполнена, событие отброшено");
+        }
     }
 
     // =========================================================================
@@ -84,6 +93,22 @@ public class DealEventProcessor {
      *             Почему poll() а не take(): take() заблокирует навсегда и не проверит running.
      */
     public void startConsumer() {
+        running.set(true);
+        Thread consumerThread = new Thread(() -> {
+            try {
+                while (running.get()) {
+                    DealEvent event = eventQueue.poll(1, TimeUnit.SECONDS);
+                    if (event != null) {
+                        processEvent(event);
+                    }
+                }
+                log.info("Consumer остановлен");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.info("Consumer остановлен");
+            }
+        }, "deal-event-consumer");
+        consumerThread.start();
     }
 
     /**
@@ -92,6 +117,8 @@ public class DealEventProcessor {
      *             Залогировать "Остановка consumer".
      */
     public void stopConsumer() {
+        running.set(false);
+        log.info("Остановка consumer");
     }
 
     /**
@@ -100,6 +127,8 @@ public class DealEventProcessor {
      *             Вызвать statisticsService.recordDealStatusChanged(event.newStatus()).
      */
     private void processEvent(DealEvent event) {
+        log.info("Обработка события: dealId={}, status={}", event.dealId(), event.newStatus());
+        statisticsService.recordDealStatusChanged(event.newStatus());
     }
 
     // =========================================================================
@@ -116,7 +145,7 @@ public class DealEventProcessor {
      *              - scheduleWithFixedDelay: каждые 10с от ЗАВЕРШЕНИЯ задачи (следующий запуск ждёт конца текущего)
      */
     public java.util.concurrent.ScheduledFuture<?> startPeriodicReport() {
-        return null;
+        return scheduler.scheduleAtFixedRate(this::generateReport, 5, 10, TimeUnit.SECONDS);
     }
 
     /**
@@ -125,6 +154,7 @@ public class DealEventProcessor {
      *             Начальная задержка — 0 секунд.
      */
     public void startQueueCleanup() {
+        scheduler.scheduleWithFixedDelay(this::cleanupQueue, 0, 30, TimeUnit.SECONDS);
     }
 
     /**
@@ -133,6 +163,7 @@ public class DealEventProcessor {
      *             Использовать scheduler.schedule().
      */
     public void scheduleReminder() {
+        scheduler.schedule(() -> log.info("Напоминание: проверь незакрытые сделки"), 60, TimeUnit.SECONDS);
     }
 
     /**
@@ -144,6 +175,16 @@ public class DealEventProcessor {
      *             Поймать InterruptedException, восстановить флаг, вызвать shutdownNow().
      */
     public void shutdown() {
+        stopConsumer();
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            scheduler.shutdownNow();
+        }
     }
 
     // =========================================================================

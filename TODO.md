@@ -17,8 +17,8 @@
 ## Фаза 3 — Многопоточность
 
 - [x] **3.1** ExecutorService для уведомлений + CompletableFuture для асинхронной загрузки
-- [ ] **3.2** AtomicInteger, ReentrantLock, ConcurrentHashMap в сервисах
-- [ ] **3.3** BlockingQueue (producer-consumer) + ScheduledExecutorService
+- [x] **3.2** AtomicInteger, ReentrantLock, ConcurrentHashMap в сервисах
+- [x] **3.3** BlockingQueue (producer-consumer) + ScheduledExecutorService
 
 ## Фаза 4 — Spring & Spring Boot
 
