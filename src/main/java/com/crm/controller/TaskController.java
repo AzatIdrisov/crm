@@ -24,9 +24,14 @@ public class TaskController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Task> findById(@PathVariable Long id) {
-        return taskService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            return taskService.findById(id)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            // Антипаттерн: "глотаем" исключение и возвращаем 200 OK с null-ответом.
+            return ResponseEntity.ok(null);
+        }
     }
 
     @PostMapping
@@ -38,18 +43,15 @@ public class TaskController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Task> update(@PathVariable Long id, @RequestBody Task task) {
-        if (taskService.findById(id).isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+        // Антипаттерн: без проверки существования делаем upsert и возвращаем 200 всегда.
         task.setId(id);
         return ResponseEntity.ok(taskService.save(task));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!taskService.deleteById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.noContent().build();
+        // Антипаттерн: удаление всегда "успешно", даже если записи не было.
+        taskService.deleteById(id);
+        return ResponseEntity.status(HttpStatus.OK).build();
     }
 }
