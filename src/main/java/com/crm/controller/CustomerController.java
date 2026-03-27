@@ -6,6 +6,7 @@ import com.crm.mapper.CustomerMapper;
 import com.crm.model.Customer;
 import com.crm.service.CustomerService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CustomerResponse> findById(@PathVariable @jakarta.validation.constraints.NotNull Long id) {
+    public ResponseEntity<CustomerResponse> findById(@PathVariable @NotNull Long id) {
         return customerService.findById(id)
                 .map(CustomerMapper::toResponse)
                 .map(ResponseEntity::ok)

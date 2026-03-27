@@ -18,6 +18,13 @@ spring:
 crm:
   # Кастомный префикс для @ConfigurationProperties (CrmProperties).
   instance-name: crm-local
+  security:
+    jwt:
+      # ВНИМАНИЕ: для продакшена секрет хранить во внешнем хранилище/ENV.
+      secret: "change-me-please-change-me-please"
+      # Время жизни access token.
+      expiration: 15m
+      issuer: crm
   notification:
     # Вкл/выкл доменные уведомления (будет подключено в сервисах).
     enabled: true
