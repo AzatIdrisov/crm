@@ -4,36 +4,51 @@ import com.crm.model.Customer;
 import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
 import com.crm.model.value.Email;
+import com.crm.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+/**
+ * Сервис клиентов — Phase 5: заменяем in-memory ConcurrentHashMap на CustomerRepository.
+ *
+ * Ключевые концепции:
+ *  - @Transactional на классе: все public-методы выполняются в транзакции.
+ *    readOnly = true снижает нагрузку: Hibernate пропускает dirty-checking,
+ *    PostgreSQL может использовать read-only replica.
+ *
+ *  - @Transactional на методе переопределяет аннотацию класса.
+ *    Методы записи (save, delete) должны явно объявить readOnly = false (дефолт).
+ *
+ *  - Функциональные интерфейсы (Predicate, Function, BiFunction) остаются —
+ *    они работают с доменными объектами в памяти после загрузки из БД.
+ */
 @Service
+@Transactional(readOnly = true)
 public class CustomerService {
 
-    // In-memory хранилище — заменится на репозиторий в Фазе 5
-    private final Map<Long, Customer> store = new ConcurrentHashMap<>();
-    private final AtomicLong idSequence = new AtomicLong(1);
+    private final CustomerRepository customerRepository;
+
+    public CustomerService(CustomerRepository customerRepository) {
+        this.customerRepository = customerRepository;
+    }
 
     // -------------------------------------------------------------------------
     // Optional вместо null-проверок
     // -------------------------------------------------------------------------
 
     public Optional<Customer> findById(Long id) {
-        return Optional.ofNullable(store.get(id));
+        return customerRepository.findById(id);
     }
 
     public Optional<Customer> findByEmail(Email email) {
-        return store
-                .values()
-                .stream()
-                .filter(customer -> email.equals(customer.getEmail()))
-                .findFirst();
+        return customerRepository.findByEmailValue(email.value());
     }
 
     public Customer getByIdOrThrow(Long id) {
@@ -52,20 +67,22 @@ public class CustomerService {
         findById(id).ifPresent(c -> System.out.println(c.getFullName()));
     }
 
+    @Transactional
     public Customer save(Customer customer) {
-        if (customer.getId() == null) {
-            customer.setId(idSequence.getAndIncrement());
-        }
-        store.put(customer.getId(), customer);
-        return customer;
+        return customerRepository.save(customer);
     }
 
     public List<Customer> findAll() {
-        return new ArrayList<>(store.values());
+        return customerRepository.findAll();
     }
 
+    @Transactional
     public boolean deleteById(Long id) {
-        return store.remove(id) != null;
+        if (!customerRepository.existsById(id)) {
+            return false;
+        }
+        customerRepository.deleteById(id);
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -87,7 +104,7 @@ public class CustomerService {
     }
 
     public List<Customer> filter(Predicate<Customer> predicate) {
-        return store.values().stream().filter(predicate).toList();
+        return customerRepository.findAll().stream().filter(predicate).toList();
     }
 
     // -------------------------------------------------------------------------
@@ -100,7 +117,6 @@ public class CustomerService {
                     c.getLastName(),
                     Optional.ofNullable(c.getCompany()).orElse("no company")
             );
-
 
     public static final Function<Customer, String> TO_UPPER_DISPLAY = TO_DISPLAY_NAME.andThen(String::toUpperCase);
 
@@ -117,10 +133,8 @@ public class CustomerService {
                     .filter(d -> customer.equals(d.getCustomer()))
                     .toList();
 
-
     public static BiFunction<Customer, DealStatus, Predicate<Deal>> dealsByStatus() {
         return (customer, status) ->
                 d -> customer.equals(d.getCustomer()) && d.getStatus() == status;
     }
-
 }

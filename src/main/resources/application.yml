@@ -1,83 +1,113 @@
 spring:
   application:
-    # Имя приложения — используется в логах, Actuator и Spring Cloud (если появится).
     name: crm
 
-  # На данном этапе отключаем автоконфигурацию БД и Redis,
-  # пока не настроена инфраструктура (Фазы 5 и 6)
+  # ===== DataSource =====
+  datasource:
+    # Значения берутся из ENV-переменных, дефолты для локального запуска.
+    # В проде: DB_URL, DB_USERNAME, DB_PASSWORD задаются в окружении/secrets.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/crm}
+    username: ${DB_USERNAME:crm}
+    password: ${DB_PASSWORD:crm}
+    driver-class-name: org.postgresql.Driver
+    # HikariCP (дефолтный пул в Spring Boot) — настройки пула соединений
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000   # 30 сек ожидания свободного соединения
+      idle-timeout: 600000        # 10 мин — убрать простаивающее соединение
+      max-lifetime: 1800000       # 30 мин — максимальное время жизни соединения
+
+  # ===== JPA / Hibernate =====
+  jpa:
+    # none: DDL управляется Liquibase, Hibernate не трогает схему.
+    # validate: проверяет соответствие сущностей и схемы БД (полезно в CI).
+    # create-drop: пересоздаёт схему при старте/остановке (только для тестов).
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        # Форматировать SQL в логах (только если show-sql: true или DEBUG)
+        format_sql: true
+        # Dialect явно — без него Hibernate может угадать неверно при нестандартном JDBC URL
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Batch size для INSERT/UPDATE: накапливает N операций и отправляет одним пакетом.
+        # Критично для bulk-операций — без батчинга N сущностей = N round-trips к БД.
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+        # default_batch_fetch_size: решает часть N+1 через IN-запросы вместо отдельных SELECT
+        default_batch_fetch_size: 25
+
+  # ===== Liquibase =====
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    enabled: true
+
+  # Redis отключён до Фазы 6
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
-      - org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration
 
 crm:
-  # Кастомный префикс для @ConfigurationProperties (CrmProperties).
   instance-name: crm-local
   security:
     jwt:
-      # ВНИМАНИЕ: для продакшена секрет хранить во внешнем хранилище/ENV.
       secret: "change-me-please-change-me-please"
-      # Время жизни access token.
       expiration: 15m
       issuer: crm
   notification:
-    # Вкл/выкл доменные уведомления (будет подключено в сервисах).
     enabled: true
-    # Длительность парсится Spring Boot как Duration: 60s, 5m, 2h и т.д.
     reminder-delay: 60s
   queue:
-    # Ограничение очереди событий, см. DealEventProcessor.
     capacity: 100
 
 server:
-  # Порт HTTP сервера приложения.
   port: 8080
 
 management:
   endpoints:
     web:
-      # Явно открываем основные Actuator endpoints для локальной диагностики.
       exposure:
         include: health, info, metrics, prometheus
   endpoint:
     health:
-      # Для dev удобно видеть детали состояния.
       show-details: always
 
 springdoc:
   api-docs:
-    # Swagger OpenAPI JSON.
     path: /api-docs
   swagger-ui:
-    # UI документации.
     path: /swagger-ui.html
 
 logging:
   level:
-    # Локальный уровень логов приложения и Spring.
     com.crm: DEBUG
     org.springframework: INFO
+    # Логировать SQL — включать только при отладке, в проде оставлять INFO/OFF
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 ---
-# Профиль dev активируется через:
-#   - переменную окружения SPRING_PROFILES_ACTIVE=dev
-#   - аргумент --spring.profiles.active=dev
 spring:
   config:
     activate:
       on-profile: dev
 
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/crm_dev}
+
+  jpa:
+    show-sql: true
+
 crm:
-  # Пример переопределения для окружения.
   instance-name: crm-dev
 
 server:
-  # Отдельный порт для dev (чтобы не конфликтовать с prod или другим сервисом).
   port: 8081
 
 logging:
@@ -85,17 +115,27 @@ logging:
     com.crm: DEBUG
 
 ---
-# Профиль prod активируется тем же способом, но значением "prod".
 spring:
   config:
     activate:
       on-profile: prod
 
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
 crm:
-  # Идентификатор инстанса в проде (можно привязать к окружению/инфраструктуре).
   instance-name: crm-prod
 
 logging:
   level:
-    # В проде обычно снижаем шум логов.
     com.crm: INFO
+    org.hibernate.SQL: OFF

@@ -1,39 +1,51 @@
 package com.crm.service;
 
 import com.crm.model.Task;
+import com.crm.repository.TaskRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
+@Transactional(readOnly = true)
 public class TaskService {
 
-    // In-memory хранилище — заменится на репозиторий в Фазе 5
-    private final Map<Long, Task> store = new ConcurrentHashMap<>();
-    private final AtomicLong idSequence = new AtomicLong(1);
+    private final TaskRepository taskRepository;
+
+    public TaskService(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
 
     public Optional<Task> findById(Long id) {
-        return Optional.ofNullable(store.get(id));
+        return taskRepository.findById(id);
     }
 
     public List<Task> findAll() {
-        return new ArrayList<>(store.values());
+        return taskRepository.findAll();
     }
 
+    public List<Task> findByDeal(Long dealId) {
+        return taskRepository.findByDealId(dealId);
+    }
+
+    public List<Task> findOverdue() {
+        return taskRepository.findOverdue(LocalDate.now());
+    }
+
+    @Transactional
     public Task save(Task task) {
-        if (task.getId() == null) {
-            task.setId(idSequence.getAndIncrement());
-        }
-        store.put(task.getId(), task);
-        return task;
+        return taskRepository.save(task);
     }
 
+    @Transactional
     public boolean deleteById(Long id) {
-        return store.remove(id) != null;
+        if (!taskRepository.existsById(id)) {
+            return false;
+        }
+        taskRepository.deleteById(id);
+        return true;
     }
 }

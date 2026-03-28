@@ -1,11 +1,21 @@
 package com.crm.model.value;
 
+import jakarta.persistence.Embeddable;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Currency;
 
 // Value Object для денежной суммы.
 // Хранит сумму и валюту вместе — нельзя случайно сложить рубли с долларами.
+//
+// @Embeddable: Money маппится в две колонки родительской таблицы:
+//   amount   → DECIMAL(19,2)
+//   currency → CHAR(3)  (через CurrencyConverter с autoApply = true)
+//
+// Нюанс: Currency не имеет базового JPA-маппинга, поэтому CurrencyConverter
+// помечен autoApply = true и применяется автоматически.
+@Embeddable
 public record Money(BigDecimal amount, Currency currency) {
 
     public Money {

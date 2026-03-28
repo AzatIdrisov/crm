@@ -3,51 +3,61 @@ package com.crm.service;
 import com.crm.model.User;
 import com.crm.model.enums.UserRole;
 import com.crm.model.value.Email;
+import com.crm.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.PostConstruct;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
+@Transactional(readOnly = true)
 public class UserService {
 
-    // In-memory хранилище — заменится на репозиторий в Фазе 5.
-    private final Map<String, User> usersByEmail = new ConcurrentHashMap<>();
-    private final AtomicLong idSequence = new AtomicLong(1);
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Инициализация дефолтных пользователей при старте.
+     *
+     * Нюанс: @PostConstruct вызывается после инициализации бина, но до первого запроса.
+     * Используем existsByEmailValue чтобы не дублировать пользователей при рестарте.
+     * В продакшене такой подход неприемлем — используют Liquibase data-changesets.
+     */
     @PostConstruct
+    @Transactional
     public void initDefaults() {
-        // Для демо: дефолтные пользователи. В проде так делать нельзя.
-        register("admin@crm.local", "admin123", UserRole.ADMIN);
-        register("manager@crm.local", "manager123", UserRole.MANAGER);
-        register("viewer@crm.local", "viewer123", UserRole.VIEWER);
+        registerIfAbsent("admin@crm.local",   "admin123",   UserRole.ADMIN);
+        registerIfAbsent("manager@crm.local", "manager123", UserRole.MANAGER);
+        registerIfAbsent("viewer@crm.local",  "viewer123",  UserRole.VIEWER);
     }
 
     public Optional<User> findByEmail(String email) {
-        return Optional.ofNullable(usersByEmail.get(normalizeEmail(email)));
+        return userRepository.findByEmailValue(normalizeEmail(email));
     }
 
+    @Transactional
     public User register(String email, String rawPassword, UserRole role) {
         String normalized = normalizeEmail(email);
-        // TODO(4.7): добавить проверку уникальности email и правила сложности пароля.
         User user = User.builder()
-                .id(idSequence.getAndIncrement())
                 .email(new Email(normalized))
-                // Храним только хэш пароля.
                 .password(passwordEncoder.encode(rawPassword))
                 .role(role)
                 .build();
-        usersByEmail.put(normalized, user);
-        return user;
+        return userRepository.save(user);
+    }
+
+    private void registerIfAbsent(String email, String rawPassword, UserRole role) {
+        String normalized = normalizeEmail(email);
+        if (!userRepository.existsByEmailValue(normalized)) {
+            register(normalized, rawPassword, role);
+        }
     }
 
     private String normalizeEmail(String email) {

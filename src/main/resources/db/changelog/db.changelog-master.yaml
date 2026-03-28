@@ -1,0 +1,17 @@
+databaseChangeLog:
+  # Liquibase читает changesets в порядке их перечисления здесь.
+  # Каждый changeset применяется ровно ОДИН раз — Liquibase хранит историю в
+  # таблице DATABASECHANGELOG и не повторяет уже применённые.
+  #
+  # Принципы:
+  #  - один файл = один логический блок изменений (создание таблиц, индексы, данные)
+  #  - никогда не редактировать применённый changeset — только новые changesets
+  #  - rollback секции позволяют откатить изменение: liquibase rollbackCount 1
+
+  - include:
+      file: db/changelog/001-init-schema.sql
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/002-indexes.sql
+      relativeToChangelogFile: false

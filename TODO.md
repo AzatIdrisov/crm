@@ -28,14 +28,14 @@
 - [x] **4.4** Кастомные аннотации валидации (@UniqueEmail, @ValidPhone) с собственным ConstraintValidator
 - [x] **4.5** @ControllerAdvice: глобальная обработка ошибок (MethodArgumentNotValidException, ConstraintViolationException, кастомные исключения)
 - [x] **4.6** Иерархия исключений (CrmException → ResourceNotFoundException, ValidationException, ConflictException) + ErrorResponse DTO
-- [ ] **4.7** Spring Security + JWT аутентификация и авторизация по ролям
-- [ ] **4.8** Spring Events: DealStatusChangedEvent + @Async @EventListener
+- [x] **4.7** Spring Security + JWT аутентификация и авторизация по ролям
+- [x] **4.8** Spring Events: DealStatusChangedEvent + @Async @EventListener
 
 ## Фаза 5 — База данных (PostgreSQL)
 
-- [ ] **5.1** JPA: связи @OneToMany/@ManyToOne/@ManyToMany, @Version, @Embeddable
-- [ ] **5.2** Spring Data JPA: Specification, проекции, @Query, @Modifying
-- [ ] **5.3** Liquibase: миграции для всех таблиц + индексы
+- [x] **5.1** JPA: связи @OneToMany/@ManyToOne/@ManyToMany, @Version, @Embeddable
+- [x] **5.2** Spring Data JPA: Specification, проекции, @Query, @Modifying
+- [x] **5.3** Liquibase: миграции для всех таблиц + индексы
 
 ## Фаза 6 — Кэширование
 
