@@ -47,6 +47,12 @@ public class UniqueEmailValidator implements ConstraintValidator<UniqueEmail, St
         if (value == null || value.isEmpty()) {
             return true;
         }
-        return customerService.findByEmail(new Email(value)).isEmpty();
+        try {
+            return customerService.findByEmail(new Email(value)).isEmpty();
+        } catch (IllegalArgumentException e) {
+            // Невалидный формат email — не наша ответственность, её проверяет @Email.
+            // Возвращаем true чтобы не генерировать двойную ошибку и не бросать 500.
+            return true;
+        }
     }
 }

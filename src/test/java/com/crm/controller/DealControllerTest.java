@@ -15,6 +15,8 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAut
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -46,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = DealController.class,
         excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class}
 )
+@TestPropertySource(properties = "spring.cache.type=none")
 @DisplayName("DealController @WebMvcTest")
 class DealControllerTest {
 
@@ -57,6 +60,12 @@ class DealControllerTest {
 
     @MockBean
     DealService dealService;
+
+    // JwtAuthenticationFilter (@Component) подхватывается @WebMvcTest и требует эти бины.
+    @MockBean
+    com.crm.security.JwtService jwtService;
+    @MockBean
+    UserDetailsService userDetailsService;
 
     private Deal deal;
 

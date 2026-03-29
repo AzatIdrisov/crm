@@ -18,6 +18,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -64,6 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class}
 )
 @Import(UniqueEmailValidator.class)
+@TestPropertySource(properties = "spring.cache.type=none")
 @DisplayName("CustomerController @WebMvcTest")
 class CustomerControllerTest {
 
@@ -77,6 +80,13 @@ class CustomerControllerTest {
     // UniqueEmailValidator получит этот же mock через конструктор.
     @MockBean
     CustomerService customerService;
+
+    // JwtAuthenticationFilter (@Component) подхватывается @WebMvcTest и требует эти бины.
+    // Мокируем чтобы контекст поднялся без реального JWT/UserDetails.
+    @MockBean
+    com.crm.security.JwtService jwtService;
+    @MockBean
+    UserDetailsService userDetailsService;
 
     private Customer alice;
     private CustomerResponse aliceResponse;
