@@ -4,8 +4,13 @@ import com.crm.event.DealStatusChangedEvent;
 import com.crm.exception.ResourceNotFoundException;
 import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
+import com.crm.config.CacheNames;
 import com.crm.repository.DealRepository;
 import com.crm.repository.spec.DealSpecification;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -41,11 +46,16 @@ public class DealService {
         this.publisher = publisher;
     }
 
+    // findById — НЕ кэшируем: возвращает Deal без JOIN FETCH, lazy-поля могут быть прокси.
+    // При сериализации в Redis Hibernate6Module запишет их как {"id":X} без данных.
+    // Используй findByIdWithDetails если нужны данные customer/assignedTo.
     public Optional<Deal> findById(Long id) {
         return dealRepository.findById(id);
     }
 
-    /** Загрузить сделку вместе с customer и assignedTo за один SELECT (JOIN FETCH). */
+    // findByIdWithDetails кэшируем: JOIN FETCH гарантирует что customer и assignedTo
+    // полностью загружены до закрытия сессии → сериализация в Redis безопасна.
+    @Cacheable(value = CacheNames.DEALS, key = "#id", unless = "#result.isEmpty()")
     public Optional<Deal> findByIdWithDetails(Long id) {
         return dealRepository.findByIdWithDetails(id);
     }
@@ -54,11 +64,13 @@ public class DealService {
         return dealRepository.findAll();
     }
 
+    @CacheEvict(value = CacheNames.DEALS, key = "#result.id")
     @Transactional
     public Deal save(Deal deal) {
         return dealRepository.save(deal);
     }
 
+    @CacheEvict(value = CacheNames.DEALS, key = "#id")
     @Transactional
     public boolean deleteById(Long id) {
         if (!dealRepository.existsById(id)) {
@@ -76,6 +88,7 @@ public class DealService {
      * только после commit основной транзакции. Если нужна гарантия — использовать
      * TransactionalEventListener(phase = AFTER_COMMIT).
      */
+    @CacheEvict(value = CacheNames.DEALS, key = "#id")
     @Transactional
     public Deal changeStatus(Long id, DealStatus newStatus) {
         Deal deal = dealRepository.findById(id)
@@ -92,6 +105,7 @@ public class DealService {
      * Массовое обновление статуса через @Modifying — без загрузки объекта.
      * Возвращает количество обновлённых строк.
      */
+    @CacheEvict(value = CacheNames.DEALS, key = "#id")
     @Transactional
     public int bulkUpdateStatus(Long id, DealStatus newStatus) {
         return dealRepository.updateStatus(id, newStatus);

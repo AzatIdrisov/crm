@@ -46,12 +46,18 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     enabled: true
 
-  # Redis отключён до Фазы 6
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
-      - org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration
+  # ===== Redis =====
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # password: ${REDIS_PASSWORD:} — раскомментировать если Redis требует пароль
+
+  # ===== Cache =====
+  cache:
+    # Тип кэша — Redis. Spring Boot автоматически создаст RedisCacheManager.
+    # Наш RedisConfig переопределяет его с кастомными TTL и сериализатором.
+    type: redis
 
 crm:
   instance-name: crm-local

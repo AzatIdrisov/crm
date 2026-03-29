@@ -61,7 +61,7 @@ CREATE TABLE tasks (
     title          VARCHAR(500) NOT NULL,
     description    TEXT,
     priority       VARCHAR(50)  NOT NULL,
-    deal_id        BIGINT       REFERENCES deals (id) ON DELETE SET NULL,
+    deal_id        BIGINT       REFERENCES deals (id) ON DELETE CASCADE,
     assigned_to_id BIGINT       REFERENCES users (id) ON DELETE SET NULL,
     due_date       DATE,
     -- BOOLEAN DEFAULT FALSE: задача по умолчанию не выполнена

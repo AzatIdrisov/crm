@@ -4,7 +4,11 @@ import com.crm.model.Customer;
 import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
 import com.crm.model.value.Email;
+import com.crm.config.CacheNames;
 import com.crm.repository.CustomerRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +47,8 @@ public class CustomerService {
     // Optional вместо null-проверок
     // -------------------------------------------------------------------------
 
+    // Кэшируем клиента по id. unless: не кэшировать пустой Optional (клиент не найден)
+    @Cacheable(value = CacheNames.CUSTOMERS, key = "#id", unless = "#result.isEmpty()")
     public Optional<Customer> findById(Long id) {
         return customerRepository.findById(id);
     }
@@ -67,6 +73,9 @@ public class CustomerService {
         findById(id).ifPresent(c -> System.out.println(c.getFullName()));
     }
 
+    // @CachePut: обновляет кэш после сохранения — следующий findById вернёт свежие данные
+    // condition: кэшируем только если id уже известен (не новый объект)
+    @CachePut(value = CacheNames.CUSTOMERS, key = "#result.id")
     @Transactional
     public Customer save(Customer customer) {
         return customerRepository.save(customer);
@@ -76,6 +85,7 @@ public class CustomerService {
         return customerRepository.findAll();
     }
 
+    @CacheEvict(value = CacheNames.CUSTOMERS, key = "#id")
     @Transactional
     public boolean deleteById(Long id) {
         if (!customerRepository.existsById(id)) {

@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 // Автоматически регистрирует все классы с @ConfigurationProperties как Spring-бины
 @ConfigurationPropertiesScan
+// Включает Spring Cache — активирует @Cacheable / @CacheEvict / @CachePut
+@EnableCaching
 public class CrmApplication {
 
     public static void main(String[] args) {

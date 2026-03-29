@@ -104,6 +104,12 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
+        <!-- ===== Jackson: поддержка Hibernate lazy-proxy при сериализации в Redis ===== -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-hibernate6</artifactId>
+        </dependency>
+
         <!-- ===== Lombok ===== -->
         <dependency>
             <groupId>org.projectlombok</groupId>

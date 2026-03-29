@@ -54,7 +54,7 @@ import java.math.BigDecimal;
 @Import(JpaConfig.class)
 // disabledWithoutDocker = true: тесты ПРОПУСКАЮТСЯ (Skipped) если Docker недоступен,
 // вместо того чтобы падать с ошибкой. Это важно для CI/CD пайплайнов, где Docker
-// может отсутствовать, и для локальной разработки без запущенного Docker Desktop.
+// может отсутствовать, и для локальной разработки без запущенного Docker.
 // Чтобы запустить тесты: запустить Docker Desktop или Docker Engine.
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractRepositoryTest {
