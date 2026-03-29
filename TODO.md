@@ -39,11 +39,61 @@
 
 ## Фаза 6 — Кэширование
 
-- [ ] **6.1** Подключить Redis: @Cacheable, @CacheEvict, @CachePut + TTL
+- [x] **6.1** Подключить Redis: @Cacheable, @CacheEvict, @CachePut + TTL
 
 ## Фаза 7 — Тестирование
 
-- [ ] **7.1** Unit-тесты (Mockito), @WebMvcTest, @DataJpaTest, Testcontainers
+### 7.1 Unit-тесты (Mockito) — сервисы без Spring контекста
+
+- [x] **7.1.1** `CustomerServiceTest` — mock `CustomerRepository`:
+  - `findById` → возвращает `Optional.of(customer)` если найден, `Optional.empty()` если нет
+  - `getByIdOrThrow` → бросает `NoSuchElementException` если не найден
+  - `getDisplayName` → возвращает полное имя или `"Unknown Customer"` если пустое
+  - `save` → вызывает `repository.save()` и возвращает результат
+  - `deleteById` → возвращает `false` если не существует, `true` если удалено
+  - `filter(HAS_COMPANY)` → фильтрует только клиентов с компанией
+  - `mapToDisplayNames` → маппинг через `TO_DISPLAY_NAME`
+  - `GET_CUSTOMER_DEALS` — возвращает только сделки нужного клиента
+
+- [x] **7.1.2** `DealServiceTest` — mock `DealRepository` + `ApplicationEventPublisher`:
+  - `findByIdWithDetails` → hit / miss
+  - `save` → делегирует в репозиторий
+  - `deleteById` → `false` если не существует, `true` если удалено
+  - `changeStatus` → бросает `ResourceNotFoundException` если не найден
+  - `changeStatus` → меняет статус и публикует `DealStatusChangedEvent`
+  - `bulkUpdateStatus` → вызывает `repository.updateStatus()` и возвращает count
+  - `search` → вызывает `repository.findAll(spec)` с нужными параметрами
+
+- [x] **7.1.3** `UserServiceTest` — mock `UserRepository` + `PasswordEncoder`:
+  - `findByEmail` → нормализует email (trim + toLowerCase) перед поиском
+  - `register` → кодирует пароль, сохраняет пользователя с нужными полями
+  - `register` → при вызове кэш сбрасывается (проверяем через `@CacheEvict` логику)
+
+### 7.2 @WebMvcTest — HTTP-слой контроллеров
+
+- [x] **7.2.1** `CustomerControllerTest` — mock `CustomerService`:
+  - `GET /api/customers` → 200 + список
+  - `GET /api/customers/{id}` → 200 если найден, 404 если нет
+  - `POST /api/customers` → 201 Created с телом ответа
+  - `POST /api/customers` → 400 при невалидном теле (пустое имя, неверный email)
+  - `PUT /api/customers/{id}` → 200 если найден, 404 если нет
+  - `DELETE /api/customers/{id}` → 204 если удалён, 404 если нет
+
+- [x] **7.2.2** `DealControllerTest` — mock `DealService`:
+  - `GET /api/deals/{id}` → 200 если найден, 404 если нет
+  - `POST /api/deals` → 201 Created
+  - `PATCH /api/deals/{id}/status` → 200 с новым статусом
+  - `DELETE /api/deals/{id}` → 204 / 404
+
+### 7.3 @DataJpaTest + Testcontainers — уже реализовано ✅
+
+- [x] `AbstractRepositoryTest` — базовый класс с PostgreSQL Testcontainer
+- [x] `EmbeddableAndAuditingTest` — @Embeddable, @CreatedDate, @LastModifiedDate
+- [x] `CascadeAndLazyTest` — orphanRemoval, FetchType.LAZY
+- [x] `N1QueryTest` — проблема N+1 и JOIN FETCH
+- [x] `OptimisticLockingTest` — @Version, ObjectOptimisticLockingFailureException
+- [x] `SpecificationTest` — динамическая фильтрация через Specification
+- [x] `ProjectionAndModifyingTest` — проекции и @Modifying
 
 ## Фаза 8 — Инфраструктура
 
