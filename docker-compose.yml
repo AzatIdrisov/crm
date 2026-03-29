@@ -1,0 +1,96 @@
+# ============================================================
+# Docker Compose: локальная инфраструктура CRM
+#
+# Сервисы:
+#  - postgres  : база данных (Liquibase запускает миграции при старте app)
+#  - redis     : кэш (Spring Cache + @Cacheable)
+#  - app       : само приложение (собирается из Dockerfile)
+#
+# Запуск:
+#   docker compose up --build          # первый раз (сборка образа)
+#   docker compose up -d               # фоновый режим
+#   docker compose down -v             # остановить и удалить volumes
+#
+# Swagger UI:  http://localhost:8080/swagger-ui.html
+# API Docs:    http://localhost:8080/api-docs
+# Actuator:    http://localhost:8080/actuator/health
+# ============================================================
+
+services:
+
+  # ─────────────────────────── PostgreSQL ───────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: crm-postgres
+    environment:
+      POSTGRES_DB:       crm
+      POSTGRES_USER:     crm
+      POSTGRES_PASSWORD: crm
+    ports:
+      # host:container — только для локальной разработки/отладки.
+      # В проде порт наружу не пробрасывают.
+      - "5432:5432"
+    volumes:
+      # Named volume: данные переживают docker compose down (без флага -v).
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready: утилита из дистрибутива PostgreSQL, проверяет готовность принимать соединения.
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ─────────────────────────── Redis ───────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    # redis-server --appendonly yes: включает AOF (Append Only File) персистентность.
+    # Без этого при рестарте Redis потеряет все данные.
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ─────────────────────────── Application ───────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Переопределяем дефолты из application.yml.
+      # Имена сервисов Docker Compose используются как hostname внутри сети.
+      DB_URL:      jdbc:postgresql://postgres:5432/crm
+      DB_USERNAME: crm
+      DB_PASSWORD: crm
+      REDIS_HOST:  redis
+      REDIS_PORT:  6379
+      # Активируем prod-профиль для production-like настроек
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      # depends_on + condition: service_healthy — app стартует только после
+      # того как healthcheck postgres/redis вернёт healthy.
+      # Без этого app может стартовать раньше БД и упасть с connection refused.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # restart: on-failure — перезапуск при падении (не при docker compose stop).
+    restart: on-failure
+
+# ─────────────────────────── Volumes ───────────────────────────
+volumes:
+  # Named volumes управляются Docker'ом, не зависят от текущей директории.
+  # Данные сохраняются между docker compose down / up (без флага -v).
+  postgres_data:
+  redis_data:

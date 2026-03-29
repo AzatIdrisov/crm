@@ -97,4 +97,4 @@
 
 ## Фаза 8 — Инфраструктура
 
-- [ ] **8.1** Docker Compose (PostgreSQL + Redis + App) + Swagger UI
+- [x] **8.1** Docker Compose (PostgreSQL + Redis + App) + Swagger UI

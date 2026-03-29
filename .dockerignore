@@ -1,0 +1,25 @@
+# Исключаем из Docker build context всё лишнее.
+# Без этого Docker отправляет ВЕСЬ каталог в daemon при каждой сборке.
+
+# Maven артефакты и кэш — будут пересозданы в builder
+target/
+.mvn/
+
+# Git и IDE
+.git/
+.gitignore
+.idea/
+*.iml
+*.iws
+
+# Документация и заметки
+*.md
+notes/
+database.md
+
+# Другие compose файлы и конфиги окружения
+docker-compose*.yml
+.env*
+
+# Claude worktrees
+.claude/
