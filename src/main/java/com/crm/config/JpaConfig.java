@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @Configuration
 @EnableJpaAuditing
 @EnableTransactionManagement
-@EnableJpaRepositories(basePackages = "com.crm.repository")
+@EnableJpaRepositories(basePackages = "com.crm")
 public class JpaConfig {
     // Точка расширения: можно добавить кастомный AuditorAware<String>
     // для записи "кто изменил" (createdBy, modifiedBy).

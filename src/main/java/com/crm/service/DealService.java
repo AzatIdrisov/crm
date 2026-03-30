@@ -3,10 +3,10 @@ package com.crm.service;
 import com.crm.event.DealStatusChangedEvent;
 import com.crm.exception.ResourceNotFoundException;
 import com.crm.kafka.message.DealStatusChangedMessage;
-import com.crm.kafka.producer.DealEventProducer;
 import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
 import com.crm.config.CacheNames;
+import com.crm.outbox.OutboxService;
 import com.crm.repository.DealRepository;
 import com.crm.repository.spec.DealSpecification;
 import org.springframework.cache.annotation.CacheEvict;
@@ -44,14 +44,14 @@ public class DealService {
 
     private final DealRepository dealRepository;
     private final ApplicationEventPublisher publisher;
-    private final DealEventProducer dealEventProducer;
+    private final OutboxService outboxService;
 
     public DealService(DealRepository dealRepository,
                        ApplicationEventPublisher publisher,
-                       DealEventProducer dealEventProducer) {
+                       OutboxService outboxService) {
         this.dealRepository = dealRepository;
         this.publisher = publisher;
-        this.dealEventProducer = dealEventProducer;
+        this.outboxService = outboxService;
     }
 
     // findById — НЕ кэшируем: возвращает Deal без JOIN FETCH, lazy-поля могут быть прокси.
@@ -89,38 +89,32 @@ public class DealService {
     }
 
     /**
-     * Изменить статус сделки, опубликовать Spring-событие и отправить в Kafka.
+     * Изменить статус сделки, опубликовать Spring-событие и сохранить Outbox-запись.
      *
      * ── Spring ApplicationEvent (in-process) ──────────────────────────────────
      * publisher.publishEvent() — синхронный вызов внутри JVM.
      * @Async @EventListener (DealStatusChangedListener) запустит обработчик
      * в отдельном потоке после возврата из publishEvent().
      *
-     * ── Kafka (cross-process) ─────────────────────────────────────────────────
-     * dealEventProducer.send() — fire-and-forget, не блокирует транзакцию.
+     * ── Outbox Pattern (cross-process, Kafka) ─────────────────────────────────
+     * Вместо прямого dealEventProducer.send() — запись в outbox_messages.
      *
-     * ── ПРОБЛЕМА DUAL WRITE ───────────────────────────────────────────────────
-     * Текущий код содержит фундаментальную проблему: два независимых side-effect
-     * внутри одной транзакции БД:
+     * Всё в одной @Transactional:
+     *   1. deal.setStatus(newStatus)       → UPDATE deals (dirty checking)
+     *   2. outboxService.saveOutboxMessage → INSERT outbox_messages
      *
-     *   1. deal.setStatus(newStatus) → при commit → UPDATE в PostgreSQL
-     *   2. dealEventProducer.send()  → немедленная отправка в Kafka
+     * PostgreSQL гарантирует атомарность: оба изменения коммитятся или оба откатываются.
+     * Dual write устранён.
      *
-     * Сценарий потери данных:
-     *   а) send() успешно отправил в Kafka (сообщение у брокера)
-     *   б) commit() упал (БД недоступна, constraint violation и т.д.)
-     *   в) Kafka уже содержит событие, БД — нет. Состояния рассинхронизированы.
+     * @Scheduled OutboxPoller (вне транзакции):
+     *   - Читает PENDING из outbox_messages
+     *   - Публикует в Kafka через KafkaTemplate
+     *   - Помечает SENT или FAILED
      *
-     * Обратный сценарий:
-     *   а) commit() успешен (статус изменён в БД)
-     *   б) send() упал (Kafka недоступна)
-     *   в) БД изменена, событие в Kafka потеряно навсегда.
-     *
-     * ── РЕШЕНИЕ: Outbox Pattern (фаза 9.6) ───────────────────────────────────
-     * В одной транзакции: UPDATE deals + INSERT outbox_messages.
-     * Отдельный @Scheduled poller читает outbox и публикует в Kafka.
-     * Kafka-публикация полностью вынесена за пределы DB-транзакции.
-     * Гарантия: либо оба изменения закоммичены, либо ни одного.
+     * ── ГАРАНТИЯ AT-LEAST-ONCE ────────────────────────────────────────────────
+     * Если poller упадёт после send() но до UPDATE status='SENT' — при следующем
+     * тике он снова отправит то же сообщение. Consumer идемпотентен (Redis SET NX),
+     * поэтому дублирование безопасно.
      */
     @CacheEvict(value = CacheNames.DEALS, key = "#id")
     @Transactional
@@ -135,8 +129,9 @@ public class DealService {
         // Spring ApplicationEvent: in-process уведомление (NotificationService, CrmStatisticsService)
         publisher.publishEvent(new DealStatusChangedEvent(this, id, oldStatus, newStatus));
 
-        // Kafka: cross-process уведомление (fire-and-forget, DUAL WRITE — см. комментарий выше)
-        dealEventProducer.send(new DealStatusChangedMessage(
+        // Outbox Pattern: атомарная запись события вместе с бизнес-изменением.
+        // Kafka-публикация выполнится отдельным @Scheduled poller'ом (OutboxPoller).
+        outboxService.saveOutboxMessage(new DealStatusChangedMessage(
                 id,
                 oldStatus,
                 newStatus,

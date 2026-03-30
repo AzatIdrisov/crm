@@ -203,7 +203,7 @@
 
 ### 9.5 Consumer
 
-- [ ] **9.5.1** Создать `kafka/consumer/DealEventConsumer.java`:
+- [x] **9.5.1** Создать `kafka/consumer/DealEventConsumer.java`:
   ```java
   @KafkaListener(
       topics = "deal-status-changed",
@@ -217,7 +217,7 @@
   Концепт: **AckMode.MANUAL_IMMEDIATE** — offset коммитится сразу после `ack.acknowledge()`;
   **at-least-once** — при падении до `ack` сообщение придёт повторно → нужна идемпотентность.
 
-- [ ] **9.5.2** Добавить проверку идемпотентности через Redis:
+- [x] **9.5.2** Добавить проверку идемпотентности через Redis:
   ```java
   String key = "kafka:processed:" + record.value().messageId();
   if (Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
@@ -230,11 +230,11 @@
   Концепт: **idempotent consumer** — защита от дублей при rebalance или retry;
   Redis как хранилище processed message IDs; TTL — компромисс между памятью и окном дедупликации.
 
-- [ ] **9.5.3** Добавить логирование metadata: `topic`, `partition`, `offset`, `key`.
+- [x] **9.5.3** Добавить логирование metadata: `topic`, `partition`, `offset`, `key`.
   Концепт: **ConsumerRecord metadata** — offset как позиция в партиции;
   как `__consumer_offsets` хранит committed offsets; consumer lag.
 
-- [ ] **9.5.4** Создать `kafka/consumer/DlqConsumer.java` с `@KafkaListener(topics = "deal-status-changed.DLT")`.
+- [x] **9.5.4** Создать `kafka/consumer/DlqConsumer.java` с `@KafkaListener(topics = "deal-status-changed.DLT")`.
   Логировать заголовки: `DLT_EXCEPTION_CAUSE_FQCN`, `DLT_ORIGINAL_TOPIC`,
   `DLT_ORIGINAL_PARTITION`, `DLT_ORIGINAL_OFFSET`.
   Концепт: **Dead Letter Topic headers** — метаданные первоначальной ошибки;
@@ -242,35 +242,35 @@
 
 ### 9.6 Outbox Pattern
 
-- [ ] **9.6.1** Создать `outbox/OutboxMessage.java` — `@Entity @Table(name = "outbox_messages")`:
+- [x] **9.6.1** Создать `outbox/OutboxMessage.java` — `@Entity @Table(name = "outbox_messages")`:
   поля: `aggregateType`, `aggregateId`, `eventType`, `payload` (JSON), `messageId` (UUID),
   `status` (PENDING / SENT / FAILED), `createdAt`, `processedAt`.
   Концепт: **Outbox Pattern** — событие сохраняется в той же транзакции что и бизнес-данные;
   UPDATE deals + INSERT outbox_messages атомарны в рамках одной PostgreSQL-транзакции;
   устраняет dual write.
 
-- [ ] **9.6.2** Добавить Liquibase changeset `003-outbox.sql`: таблица `outbox_messages` +
+- [x] **9.6.2** Добавить Liquibase changeset `003-outbox.sql`: таблица `outbox_messages` +
   индекс `idx_outbox_status` по колонке `status`.
   Концепт: индекс на статус для быстрого выбора PENDING-записей; без него poller деградирует при росте таблицы.
 
-- [ ] **9.6.3** Создать `outbox/OutboxRepository.java`:
+- [x] **9.6.3** Создать `outbox/OutboxRepository.java`:
   ```java
   List<OutboxMessage> findTop100ByStatusOrderByCreatedAtAsc(OutboxStatus status);
   ```
   Концепт: ограничение батча poller'а; сортировка по `createdAt` сохраняет порядок событий.
 
-- [ ] **9.6.4** Создать `outbox/OutboxService.java` с методом
+- [x] **9.6.4** Создать `outbox/OutboxService.java` с методом
   `saveOutboxMessage(DealStatusChangedMessage msg)` и `@Transactional(propagation = MANDATORY)`.
   Концепт: **MANDATORY propagation** — гарантирует что запись в outbox будет в транзакции вызывающего;
   если вызвать без транзакции — `IllegalTransactionStateException`;
   сравнение: REQUIRES_NEW vs MANDATORY для Outbox.
 
-- [ ] **9.6.5** Обновить `DealService.changeStatus()`: вызвать `outboxService.saveOutboxMessage(...)`
+- [x] **9.6.5** Обновить `DealService.changeStatus()`: вызвать `outboxService.saveOutboxMessage(...)`
   внутри существующей `@Transactional`. Убрать прямой `dealEventProducer.send()` — теперь
   публикация в Kafka происходит только через poller.
   Концепт: полная реализация Outbox — единственная точка публикации, транзакционная гарантия.
 
-- [ ] **9.6.6** Создать `outbox/OutboxPoller.java` с `@Scheduled(fixedDelay = 1000)`:
+- [x] **9.6.6** Создать `outbox/OutboxPoller.java` с `@Scheduled(fixedDelay = 1000)`:
   читать 100 PENDING-записей → публиковать в Kafka → обновлять статус в SENT/FAILED.
   Добавить `@EnableScheduling` в конфигурацию.
   Концепт: **Polling Outbox** — периодически читает PENDING, публикует, помечает SENT;
