@@ -119,12 +119,12 @@
 
 ### 9.2 Конфигурация Kafka (KafkaConfig + KafkaTopics)
 
-- [ ] **9.2.1** Создать `kafka/config/KafkaTopics.java`: объявить `@Bean NewTopic dealStatusChanged()`
+- [x] **9.2.1** Создать `kafka/config/KafkaTopics.java`: объявить `@Bean NewTopic dealStatusChanged()`
   через `TopicBuilder.name("deal-status-changed").partitions(3).replicas(1).build()`.
   Концепт: **TopicBuilder** — декларативное создание топиков через `KafkaAdmin`;
   `partitions=3` позволяет параллельно работать 3 consumer'ам в одной group.id.
 
-- [ ] **9.2.2** Создать `kafka/config/KafkaConfig.java` с конфигурацией producer и consumer:
+- [x] **9.2.2** Создать `kafka/config/KafkaConfig.java` с конфигурацией producer и consumer:
 
   **Idempotent producer (non-transactional):**
   ```
@@ -160,7 +160,7 @@
   `isolation.level=read_committed` — consumer не видит сообщения из незакоммиченных транзакций;
   `max.poll.records` и `max.poll.interval.ms` — защита от rebalance-таймаута при медленной обработке.
 
-- [ ] **9.2.3** Добавить `KafkaListenerContainerFactory` с `DefaultErrorHandler` +
+- [x] **9.2.3** Добавить `KafkaListenerContainerFactory` с `DefaultErrorHandler` +
   `ExponentialBackOffWithMaxRetries(3)` и `DeadLetterPublishingRecoverer`.
   Концепт: **retry с exponential backoff** — при exception consumer делает 3 попытки
   с удвоением паузы (1s → 2s → 4s), затем отправляет сообщение в топик `deal-status-changed.DLT`;
