@@ -53,6 +53,15 @@ spring:
       port: ${REDIS_PORT:6379}
       # password: ${REDIS_PASSWORD:} — раскомментировать если Redis требует пароль
 
+  # ===== Apache Kafka =====
+  kafka:
+    # bootstrap-servers — точка входа: список host:port брокеров для первичного подключения.
+    # Клиент использует их только для получения метаданных кластера (список всех брокеров,
+    # партиции, лидеры). После этого работает напрямую с нужным брокером.
+    # Дефолт: localhost:9092 — для запуска без Docker.
+    # В Docker Compose переопределяется переменной KAFKA_BOOTSTRAP=kafka:9092.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
   # ===== Cache =====
   cache:
     # Тип кэша — Redis. Spring Boot автоматически создаст RedisCacheManager.

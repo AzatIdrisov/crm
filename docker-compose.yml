@@ -4,6 +4,7 @@
 # Сервисы:
 #  - postgres  : база данных (Liquibase запускает миграции при старте app)
 #  - redis     : кэш (Spring Cache + @Cacheable)
+#  - kafka     : брокер сообщений (KRaft-режим, без ZooKeeper)
 #  - app       : само приложение (собирается из Dockerfile)
 #
 # Запуск:
@@ -59,6 +60,68 @@ services:
       retries: 5
       start_period: 5s
 
+  # ─────────────────────────── Kafka (KRaft) ───────────────────────────
+  #
+  # KRaft-режим (Kafka Raft Metadata) — Kafka без ZooKeeper.
+  # С версии 3.3 KRaft стал production-ready, ZooKeeper deprecated с Kafka 3.5.
+  #
+  # Ключевые настройки KRaft:
+  #  KAFKA_PROCESS_ROLES=broker,controller — узел одновременно broker и controller.
+  #    В prod кластере роли обычно разделяют: отдельные controller-ноды (3 шт.) + broker-ноды.
+  #  KAFKA_CONTROLLER_QUORUM_VOTERS — кворум контроллеров: nodeId@host:port.
+  #    При одном узле: "1@kafka:9093".
+  #  CLUSTER_ID — уникальный идентификатор кластера в формате base64 UUID.
+  #    Генерируется один раз. При пересоздании контейнера с тем же volume — должен совпадать.
+  #    Без volume (данные эфемерны) — можно хардкодить для локальной разработки.
+  #
+  # Два listener'а:
+  #  PLAINTEXT://0.0.0.0:9092 — для клиентов (producers/consumers).
+  #  CONTROLLER://0.0.0.0:9093 — внутренний, только для Raft-коммуникации между контроллерами.
+  #
+  # KAFKA_ADVERTISED_LISTENERS — адрес, который брокер отдаёт клиентам при подключении.
+  #  kafka:9092 — работает внутри Docker-сети (для app-сервиса).
+  #  localhost:9092 — для подключения с хоста (IntelliJ, kafkacat и т.п.) НЕ добавляем
+  #  сюда, т.к. имя "kafka" не резолвится снаружи Docker. Для локальной разработки без
+  #  Docker достаточно дефолта localhost:9092 в application.yml.
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: crm-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft: этот узел одновременно broker и controller
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Кворум из одного контроллера — достаточно для локальной разработки
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Listener для клиентов + внутренний listener для Raft
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # Адрес, который брокер сообщает клиентам — имя сервиса в Docker-сети
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Уникальный идентификатор кластера (base64 UUID, генерируется один раз)
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qg
+      # Replication factor = 1: для одного брокера (в prod — минимум 3)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Минимальный ISR для обычных топиков (in-sync replicas)
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      # Директория для логов Kafka (данные партиций)
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      # kafka-broker-api-versions — утилита из дистрибутива Kafka.
+      # Возвращает 0 если брокер готов принимать запросы.
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
   # ─────────────────────────── Application ───────────────────────────
   app:
     build:
@@ -70,20 +133,26 @@ services:
     environment:
       # Переопределяем дефолты из application.yml.
       # Имена сервисов Docker Compose используются как hostname внутри сети.
-      DB_URL:      jdbc:postgresql://postgres:5432/crm
-      DB_USERNAME: crm
-      DB_PASSWORD: crm
-      REDIS_HOST:  redis
-      REDIS_PORT:  6379
+      DB_URL:           jdbc:postgresql://postgres:5432/crm
+      DB_USERNAME:      crm
+      DB_PASSWORD:      crm
+      REDIS_HOST:       redis
+      REDIS_PORT:       6379
+      # Имя сервиса kafka используется как hostname внутри Docker-сети.
+      # Дефолт в application.yml — localhost:9092 (для запуска без Docker).
+      KAFKA_BOOTSTRAP:  kafka:9092
       # Активируем prod-профиль для production-like настроек
       SPRING_PROFILES_ACTIVE: prod
     depends_on:
       # depends_on + condition: service_healthy — app стартует только после
-      # того как healthcheck postgres/redis вернёт healthy.
-      # Без этого app может стартовать раньше БД и упасть с connection refused.
+      # того как healthcheck postgres/redis/kafka вернёт healthy.
+      # Без этого app может стартовать раньше брокера и упасть при попытке
+      # подключиться к Kafka при инициализации KafkaAdmin (создание топиков).
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     # restart: on-failure — перезапуск при падении (не при docker compose stop).
     restart: on-failure
@@ -94,3 +163,4 @@ volumes:
   # Данные сохраняются между docker compose down / up (без флага -v).
   postgres_data:
   redis_data:
+  kafka_data:
