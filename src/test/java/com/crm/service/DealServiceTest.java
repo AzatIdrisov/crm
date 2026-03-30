@@ -2,6 +2,8 @@ package com.crm.service;
 
 import com.crm.event.DealStatusChangedEvent;
 import com.crm.exception.ResourceNotFoundException;
+import com.crm.kafka.message.DealStatusChangedMessage;
+import com.crm.kafka.producer.DealEventProducer;
 import com.crm.model.Customer;
 import com.crm.model.Deal;
 import com.crm.model.enums.DealStatus;
@@ -50,6 +52,9 @@ class DealServiceTest {
 
     @Mock
     ApplicationEventPublisher publisher;
+
+    @Mock
+    DealEventProducer dealEventProducer;
 
     @InjectMocks
     DealService dealService;
@@ -175,6 +180,18 @@ class DealServiceTest {
         assertThat(event.getDealId()).isEqualTo(1L);
         assertThat(event.getOldStatus()).isEqualTo(DealStatus.NEW);  // было
         assertThat(event.getNewStatus()).isEqualTo(DealStatus.WON);  // стало
+
+        // Kafka producer тоже должен получить вызов с корректными полями
+        ArgumentCaptor<DealStatusChangedMessage> msgCaptor =
+                ArgumentCaptor.forClass(DealStatusChangedMessage.class);
+        verify(dealEventProducer).send(msgCaptor.capture());
+
+        DealStatusChangedMessage msg = msgCaptor.getValue();
+        assertThat(msg.dealId()).isEqualTo(1L);
+        assertThat(msg.oldStatus()).isEqualTo(DealStatus.NEW);
+        assertThat(msg.newStatus()).isEqualTo(DealStatus.WON);
+        assertThat(msg.messageId()).isNotBlank();   // UUID сгенерирован
+        assertThat(msg.occurredAt()).isNotNull();
     }
 
     @Test

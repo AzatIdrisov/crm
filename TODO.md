@@ -183,7 +183,7 @@
 
 ### 9.4 Producer
 
-- [ ] **9.4.1** Создать `kafka/producer/DealEventProducer.java`. Метод `send()` использует
+- [x] **9.4.1** Создать `kafka/producer/DealEventProducer.java`. Метод `send()` использует
   `kafkaTemplate.send("deal-status-changed", msg.dealId().toString(), msg)` —
   `dealId` как ключ партицонирования гарантирует, что все события одной сделки
   попадают в одну партицию и обрабатываются **в порядке отправки**.
@@ -191,12 +191,12 @@
   Концепт: **partition key для ordering**, **fire-and-forget vs. synchronous send**,
   `RecordMetadata` (топик, партиция, offset) из callback.
 
-- [ ] **9.4.2** Добавить метод `sendTransactional()` через `kafkaTemplate.executeInTransaction(...)`.
+- [x] **9.4.2** Добавить метод `sendTransactional()` через `kafkaTemplate.executeInTransaction(...)`.
   Концепт: **transactional send** — `beginTransaction()` / `commitTransaction()` / `abortTransaction()`;
   как `@Transactional` на бине с `transactional.id` интегрируется с `KafkaTransactionManager`;
   отличие от обычного `KafkaTemplate` без `transactional.id`.
 
-- [ ] **9.4.3** Обновить `DealService.changeStatus()`: добавить вызов `dealEventProducer.send(...)`
+- [x] **9.4.3** Обновить `DealService.changeStatus()`: добавить вызов `dealEventProducer.send(...)`
   рядом с `publisher.publishEvent(...)`. Добавить комментарий: почему прямой вызов
   `kafkaTemplate.send()` внутри `@Transactional` создаёт проблему **dual write**
   (DB commit + Kafka publish не атомарны) — и что Outbox Pattern решает это.
