@@ -168,7 +168,7 @@
 
 ### 9.3 DTO сообщения
 
-- [ ] **9.3.1** Создать `kafka/message/DealStatusChangedMessage.java` — Java record:
+- [x] **9.3.1** Создать `kafka/message/DealStatusChangedMessage.java` — Java record:
   ```java
   record DealStatusChangedMessage(
       Long dealId,
