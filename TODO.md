@@ -280,14 +280,14 @@
 
 ### 9.7 Тесты с @EmbeddedKafka
 
-- [ ] **9.7.1** Создать `KafkaProducerConsumerIntegrationTest` — `@SpringBootTest` + `@EmbeddedKafka`.
+- [x] **9.7.1** Создать `KafkaProducerConsumerIntegrationTest` — `@SpringBootTest` + `@EmbeddedKafka`.
   Тест: `DealEventProducer.send()` → `KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(5))`
   → проверить payload сообщения.
   Концепт: **`@EmbeddedKafka`** — in-process брокер без Docker;
   vs Testcontainers Kafka — trade-off скорость vs реализм;
   `@EmbeddedKafka(bootstrapServersProperty = "spring.kafka.bootstrap-servers")`.
 
-- [ ] **9.7.2** Создать `OutboxPollerIntegrationTest` — `@SpringBootTest` + `@EmbeddedKafka`
+- [x] **9.7.2** Создать `OutboxPollerIntegrationTest` — `@SpringBootTest` + `@EmbeddedKafka`
   + PostgreSQL Testcontainer (переиспользовать подход из `AbstractRepositoryTest`).
   Сценарий: `DealService.changeStatus()` → проверить PENDING запись в БД →
   ждать срабатывания poller'а через Awaitility (`await().atMost(5, SECONDS)`) →
@@ -295,7 +295,7 @@
   Концепт: **интеграционный тест Outbox end-to-end**;
   **Awaitility** для async assertions вместо `Thread.sleep`.
 
-- [ ] **9.7.3** Создать `DlqIntegrationTest`: consumer намеренно бросает исключение →
+- [x] **9.7.3** Создать `DlqIntegrationTest`: consumer намеренно бросает исключение →
   после 3 retry сообщение попадает в `deal-status-changed.DLT` →
   проверить заголовок `KafkaHeaders.DLT_ORIGINAL_TOPIC`.
   Концепт: тестирование retry-логики и DLT; BackOff-последовательность;
@@ -303,7 +303,7 @@
 
 ### 9.8 Конспект: вопросы с собеседований
 
-- [ ] **9.8.1** Создать `notes/kafka-interview.md` с разделами:
+- [x] **9.8.1** Создать `notes/kafka-interview.md` с разделами:
   - **Гарантии доставки**: at-most-once / at-least-once / exactly-once — условия и настройки для каждого
   - **Rebalancing**: когда происходит; `RangeAssignor` vs `CooperativeStickyAssignor`;
     Stop-The-World vs incremental cooperative rebalance; `max.poll.interval.ms` как триггер

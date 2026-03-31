@@ -185,6 +185,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Awaitility — async assertions без Thread.sleep -->
+        <!-- Версия управляется Spring Boot BOM -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>

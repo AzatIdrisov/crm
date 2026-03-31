@@ -1,13 +1,14 @@
 package com.crm.outbox;
 
 import com.crm.kafka.config.KafkaTopics;
+import com.crm.kafka.message.DealStatusChangedMessage;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,8 +26,22 @@ import java.util.List;
  *
  *   [OutboxPoller, каждую секунду]
  *     └─ SELECT TOP 100 WHERE status='PENDING'     ← отдельная транзакция, вне бизнес-логики
- *     └─ KafkaTemplate.send()                      ← после коммита SELECT-транзакции
- *     └─ UPDATE status='SENT'                      ← в отдельной транзакции
+ *     └─ deserialize payload → DTO                 ← восстанавливаем тип для JsonSerializer
+ *     └─ KafkaTemplate.send(dto)                   ← __TypeId__ = DealStatusChangedMessage
+ *     └─ UPDATE status='SENT'                      ← через outboxRepository.save() (отдельная TX)
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ПОЧЕМУ НЕ ОТПРАВЛЯЕМ payload (String) НАПРЯМУЮ
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  kafkaTemplate использует JsonSerializer. При отправке String он добавляет
+ *  заголовок __TypeId__=java.lang.String. DealEventConsumer ожидает
+ *  __TypeId__=DealStatusChangedMessage — при несовпадении JsonDeserializer
+ *  вернёт LinkedHashMap вместо DTO → ClassCastException в consumer'е.
+ *
+ *  Решение: десериализовать JSON payload → DTO-объект → передать в kafkaTemplate.
+ *  JsonSerializer установит правильный __TypeId__ и consumer успешно
+ *  десериализует сообщение.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * @SCHEDULED ПАРАМЕТРЫ
@@ -47,7 +62,7 @@ import java.util.List;
  *   Даёт время Kafka-соединению установиться перед первым poll'ом.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * ТРАНЗАКЦИОННОСТЬ
+ * ТРАНЗАКЦИОННОСТЬ и SELF-INVOCATION
  * ─────────────────────────────────────────────────────────────────────────────
  *
  *  poll() НЕ помечен @Transactional намеренно:
@@ -56,9 +71,13 @@ import java.util.List;
  *    - Транзакция держится открытой во время send() → lock на строках outbox
  *    - При медленной Kafka или network latency → долгие транзакции, deadlocks
  *
- *  Вместо этого — два отдельных шага:
- *   1. Читаем PENDING (read-only транзакция через @Transactional(readOnly=true) в репозитории)
- *   2. Для каждого: send() → markAsSent()/markAsFailed() в отдельной транзакции
+ *  markAsSent/markAsFailed НЕ помечены @Transactional:
+ *   Они вызываются из whenComplete-callback (другой поток) и catch-блока.
+ *   Оба случая — self-invocation через this: Spring AOP proxy не перехватывает вызов.
+ *   Поэтому @Transactional на методах OutboxPoller не работает при вызове изнутри класса.
+ *
+ *   Решение: транзакция обеспечивается SimpleJpaRepository.save() который
+ *   аннотирован @Transactional сам по себе. Каждый save — отдельная мини-TX.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ГАРАНТИЯ AT-LEAST-ONCE
@@ -75,11 +94,11 @@ import java.util.List;
  * МАРШРУТИЗАЦИЯ В ТОПИК
  * ─────────────────────────────────────────────────────────────────────────────
  *
- *  aggregateType → имя топика без if-else через switch expression.
+ *  aggregateType → имя топика и тип DTO без if-else через switch expression.
  *  При добавлении нового типа агрегата:
  *   1. Добавить константу в KafkaTopics
- *   2. Добавить case в resolveTopicName()
- *  Не нужно менять поллер — open/closed principle.
+ *   2. Добавить case в resolveTopicName() и deserializePayload()
+ *  Не нужно менять остальной код поллера — open/closed principle.
  */
 @Component
 public class OutboxPoller {
@@ -88,11 +107,14 @@ public class OutboxPoller {
 
     private final OutboxRepository outboxRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
     public OutboxPoller(OutboxRepository outboxRepository,
-                        KafkaTemplate<String, Object> kafkaTemplate) {
+                        KafkaTemplate<String, Object> kafkaTemplate,
+                        ObjectMapper objectMapper) {
         this.outboxRepository = outboxRepository;
         this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -116,8 +138,13 @@ public class OutboxPoller {
             try {
                 String topic = resolveTopicName(message.getAggregateType());
 
+                // Десериализуем JSON payload обратно в DTO:
+                //  Если передать String напрямую, JsonSerializer установит
+                //  __TypeId__=String → consumer получит LinkedHashMap вместо DTO.
+                Object dto = deserializePayload(message.getAggregateType(), message.getPayload());
+
                 // aggregateId как partition key → ordering событий по конкретному агрегату
-                kafkaTemplate.send(topic, message.getAggregateId(), message.getPayload())
+                kafkaTemplate.send(topic, message.getAggregateId(), dto)
                         .whenComplete((result, ex) -> {
                             if (ex != null) {
                                 // KafkaTemplate.send() завершился ошибкой асинхронно
@@ -133,7 +160,7 @@ public class OutboxPoller {
                             }
                         });
             } catch (Exception e) {
-                // Синхронная ошибка (напр., topic не существует)
+                // Синхронная ошибка (напр., topic не существует или ошибка десериализации)
                 markAsFailed(message);
                 log.error("OutboxPoller: exception for messageId={}", message.getMessageId(), e);
             }
@@ -142,9 +169,11 @@ public class OutboxPoller {
 
     /**
      * Помечает сообщение как успешно отправленное в Kafka.
-     * Каждое обновление — отдельная мини-транзакция (нет риска долгого lock'а).
+     *
+     * Вызывается из whenComplete-callback (другой поток).
+     * НЕ @Transactional: self-invocation через this обходит Spring proxy.
+     * Транзакция обеспечивается SimpleJpaRepository.save() (@Transactional внутри).
      */
-    @Transactional
     public void markAsSent(OutboxMessage message) {
         message.setStatus(OutboxStatus.SENT);
         message.setProcessedAt(Instant.now());
@@ -156,7 +185,6 @@ public class OutboxPoller {
      * FAILED-записи можно повторить вручную: UPDATE status='PENDING'.
      * Мониторинг: COUNT WHERE status='FAILED' > 0 → алерт.
      */
-    @Transactional
     public void markAsFailed(OutboxMessage message) {
         message.setStatus(OutboxStatus.FAILED);
         message.setProcessedAt(Instant.now());
@@ -165,10 +193,6 @@ public class OutboxPoller {
 
     /**
      * Определяет Kafka-топик по типу агрегата.
-     *
-     * aggregateType хранится в outbox_messages как строка ("Deal", "Customer").
-     * Это позволяет не хардкодить маппинг в бизнес-слое — DealService
-     * просто передаёт "Deal", не зная о Kafka-топиках.
      */
     private String resolveTopicName(String aggregateType) {
         return switch (aggregateType) {
@@ -176,5 +200,27 @@ public class OutboxPoller {
             default -> throw new IllegalArgumentException(
                     "Unknown aggregateType for outbox routing: " + aggregateType);
         };
+    }
+
+    /**
+     * Десериализует JSON-payload обратно в DTO по типу агрегата.
+     *
+     * Необходимо потому что kafkaTemplate использует JsonSerializer,
+     * который записывает заголовок __TypeId__ = полное имя класса.
+     * Consumer с JsonDeserializer читает __TypeId__ чтобы определить целевой тип.
+     * Без этого consumer получит LinkedHashMap вместо нужного DTO.
+     */
+    private Object deserializePayload(String aggregateType, String payload) {
+        Class<?> targetClass = switch (aggregateType) {
+            case "Deal" -> DealStatusChangedMessage.class;
+            default -> throw new IllegalArgumentException(
+                    "Unknown aggregateType for payload deserialization: " + aggregateType);
+        };
+        try {
+            return objectMapper.readValue(payload, targetClass);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(
+                    "Cannot deserialize outbox payload for aggregateType=" + aggregateType, e);
+        }
     }
 }

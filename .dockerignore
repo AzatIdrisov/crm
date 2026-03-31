@@ -15,7 +15,7 @@ target/
 # Документация и заметки
 *.md
 notes/
-database.md
+notes/database.md
 
 # Другие compose файлы и конфиги окружения
 docker-compose*.yml
